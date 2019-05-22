@@ -59,7 +59,7 @@
             },
             "kind": "Storage",
             "properties": {},
-            "condition": "[parameters('enableVA')]"
+            "condition": "[variables('enableVA')]"
         },
         {
             "type": "Microsoft.Sql/servers",
