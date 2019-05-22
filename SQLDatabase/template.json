@@ -1,0 +1,154 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2014-04-01-preview/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "applicationName": {
+            "type": "string"
+        },
+        "environment": {
+            "type": "string"
+        },
+        "instanceIndex": {
+            "type": "string"
+        },
+        "tenantAdminLogin": {
+            "type": "string"
+        },
+        "tenantAdminPassword": {
+            "type": "securestring"
+        },
+        "tenantName": {
+            "type": "string"
+        },
+        "tenantNumber": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "subscriptionId": "[subscription().subscriptionId]",
+        "resourceGroupName": "[resourceGroup().name]",
+        "uniqueStorage": "[uniqueString(variables('subscriptionId'), variables('resourceGroupName'), variables('location'))]",
+        "storageName": "[tolower(concat('sqlva', variables('uniqueStorage')))]",
+        "collation": "SQL_Latin1_General_CP1_CI_AS",
+        "databaseName": "[concat(parameters('environment'), parameters('tenantNumber'), padLeft(take(replace(parameters('applicationName'), ' ', ''), 8),8,'x'))]",
+        "tier": "Basic",
+        "skuName": "Basic",
+        "location": "[resourceGroup().location]",
+        "maxSizeBytes": 524288000,
+        "serverName": "[concat(parameters('environment'), parameters('tenantNumber'), parameters('instanceIndex'))]",
+        "sampleName": "",
+        "zoneRedundant": false,
+        "licenseType": "",
+        "readScaleOut": "Disabled",
+        "numberOfReplicas": 0,
+        "minCapacity": "",
+        "autoPauseDelay": "",
+        "enableADS": false,
+        "allowAzureIps": true,
+        "tags": {},
+        "enableVA": false
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2016-01-01",
+            "name": "[variables('storageName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "kind": "Storage",
+            "properties": {},
+            "condition": "[parameters('enableVA')]"
+        },
+        {
+            "type": "Microsoft.Sql/servers",
+            "apiVersion": "2015-05-01-preview",
+            "name": "[variables('serverName')]",
+            "location": "[variables('location')]",
+            "tags": "[variables('tags')]",
+            "properties": {
+                "administratorLogin": "[parameters('tenantAdminLogin')]",
+                "administratorLoginPassword": "[parameters('tenantAdminPassword')]",
+                "version": "12.0"
+            },
+            "resources": [
+                {
+                    "type": "databases",
+                    "apiVersion": "2017-10-01-preview",
+                    "name": "[variables('databaseName')]",
+                    "location": "[variables('location')]",
+                    "dependsOn": [
+                        "[concat('Microsoft.Sql/servers/', variables('serverName'))]"
+                    ],
+                    "tags": "[variables('tags')]",
+                    "sku": {
+                        "name": "[variables('skuName')]",
+                        "tier": "[variables('tier')]"
+                    },
+                    "properties": {
+                        "collation": "[variables('collation')]",
+                        "maxSizeBytes": "[variables('maxSizeBytes')]",
+                        "sampleName": "[variables('sampleName')]",
+                        "zoneRedundant": "[variables('zoneRedundant')]",
+                        "licenseType": "[variables('licenseType')]",
+                        "readScale": "[variables('readScaleOut')]",
+                        "readReplicaCount": "[variables('numberOfReplicas')]",
+                        "minCapacity": "[variables('minCapacity')]",
+                        "autoPauseDelay": "[variables('autoPauseDelay')]"
+                    }
+                },
+                {
+                    "type": "firewallrules",
+                    "apiVersion": "2014-04-01-preview",
+                    "name": "AllowAllWindowsAzureIps",
+                    "location": "[variables('location')]",
+                    "dependsOn": [
+                        "[concat('Microsoft.Sql/servers/', variables('serverName'))]"
+                    ],
+                    "properties": {
+                        "endIpAddress": "0.0.0.0",
+                        "startIpAddress": "0.0.0.0"
+                    },
+                    "condition": "[variables('allowAzureIps')]"
+                },
+                {
+                    "type": "securityAlertPolicies",
+                    "apiVersion": "2017-03-01-preview",
+                    "name": "Default",
+                    "dependsOn": [
+                        "[concat('Microsoft.Sql/servers/', variables('serverName'))]",
+                        "[concat('Microsoft.Sql/servers/', variables('serverName'), '/databases/', variables('databaseName'))]"
+                    ],
+                    "properties": {
+                        "state": "Enabled",
+                        "disabledAlerts": [],
+                        "emailAddresses": [],
+                        "emailAccountAdmins": true
+                    },
+                    "condition": "[variables('enableADS')]"
+                },
+                {
+                    "type": "vulnerabilityAssessments",
+                    "apiVersion": "2018-06-01-preview",
+                    "name": "Default",
+                    "dependsOn": [
+                        "[concat('Microsoft.Sql/servers/', variables('serverName'))]",
+                        "[concat('Microsoft.Storage/storageAccounts/', variables('storageName'))]",
+                        "[concat('Microsoft.Sql/servers/', variables('serverName'), '/securityAlertPolicies/Default')]"
+                    ],
+                    "properties": {
+                        "storageContainerPath": "[if(variables('enableVA'), concat(reference(variables('storageName'), '2018-02-01').primaryEndpoints.blob, 'vulnerability-assessment'), '')]",
+                        "storageAccountAccessKey": "[if(variables('enableVA'), listKeys(variables('storageName'), '2018-02-01').keys[0].value, '')]",
+                        "recurringScans": {
+                            "isEnabled": true,
+                            "emailSubscriptionAdmins": true,
+                            "emails": []
+                        }
+                    },
+                    "condition": "[variables('enableVA')]"
+                }
+            ]
+        }
+    ]
+}

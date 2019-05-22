@@ -1,0 +1,32 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "environment": {
+            "value": "t"
+        },
+        "tenantNumber": {
+            "value": "1"
+        },
+        "applicationName":{
+            "value": "Hero Vs Robot"
+        },
+        "instanceIndex": {
+            "value": "a"
+        },
+        "tenantName": {
+            "value": "Learn Visual Studio, Inc."
+        },
+        "tenantAdminLogin": {
+            "value": "demo1heoVrobot"
+        },
+        "tenantAdminPassword": {
+            "reference": {
+            "keyVault": {
+                "id": "/subscriptions/cc82b2f9-ead2-42a4-955c-5c511f6ad770/resourceGroups/demo1/providers/Microsoft.KeyVault/vaults/s-demo1a"
+            },
+            "secretName": "tenantAdminPassword"
+            }
+        }
+    }
+}
